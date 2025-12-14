@@ -52,4 +52,19 @@ class ToolsBackfill:
         
         def _get_deck_id(self):
             return self.decks.currentData()
-        
+
+        def _get_primary_model_id(self):
+            deck_id = self._get_deck_id()
+            if deck_id:
+                nid = mw.col.db.scalar(
+                    "SELECT n.id FROM notes n JOIN cards c ON n.id = c.nid WHERE c.did = ? LIMIT 1",
+                    deck_id
+                )
+                if nid:
+                    try:
+                        note = mw.col.get_note(nid)
+                        return note.mid
+                    except:
+                        pass
+            return None
+

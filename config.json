@@ -3,5 +3,8 @@
     "reading_handlebar": "reading",
     "yomitan_api_ip": "127.0.0.1",
     "yomitan_api_port": 19633,
-    "yomitan_api_timeout": 10
+    "yomitan_api_timeout": 10,
+    "default_expression_field": "Expression",
+    "default_reading_field": "Reading",
+    "field_memory": {}
 }

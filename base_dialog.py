@@ -2,8 +2,9 @@ from aqt import mw
 from aqt.operations import CollectionOp
 from aqt.utils import showWarning
 from aqt.qt import *
-from . import anki_util  
+from . import anki_util
 from . import logger
+from . import config_manager
 import json
 
 class BaseBackfillDialog(QDialog):
@@ -12,6 +13,7 @@ class BaseBackfillDialog(QDialog):
         logger.setup_logging()
         self.finished.connect(lambda: logger.shutdown_logging())
         self.setWindowTitle("Yomitan Backfill")
+        self.primary_model_id = None
 
         self._setup_ui()
         self._setup_buttons()
@@ -79,11 +81,15 @@ class BaseBackfillDialog(QDialog):
 
     def _get_note_ids(self):
         raise NotImplementedError
-    
+
     def _get_deck_name(self):
         raise NotImplementedError
-    
+
     def _get_deck_id(self):
+        raise NotImplementedError
+
+    def _get_primary_model_id(self):
+        """Get the primary model ID for field memory. Implemented by subclasses."""
         raise NotImplementedError
 
     def _setup_buttons(self):
@@ -114,7 +120,36 @@ class BaseBackfillDialog(QDialog):
             self.reading_field.addItem(name)
 
         self.reading_field.setCurrentIndex(-1)
-    
+
+        self.primary_model_id = self._get_primary_model_id()
+        if self.primary_model_id:
+            remembered = config_manager.get_field_memory(self.primary_model_id)
+            if remembered:
+                self._set_field_selection(
+                    remembered.get('expression_field', ''),
+                    remembered.get('reading_field', '')
+                )
+                return
+
+        default_expr, default_read = config_manager.get_default_fields()
+        if default_expr or default_read:
+            self._set_field_selection(default_expr, default_read)
+
+    def _set_field_selection(self, expression_field, reading_field):
+        if expression_field:
+            idx = self.expression_field.findText(expression_field)
+            if idx >= 0:
+                self.expression_field.setCurrentIndex(idx)
+
+        if reading_field:
+            idx = self.reading_field.findText(reading_field)
+            if idx >= 0:
+                self.reading_field.setCurrentIndex(idx)
+            else:
+                self.reading_field.setCurrentIndex(-1)
+        else:
+            self.reading_field.setCurrentIndex(-1)
+
     def _load_presets(self):
         self.preset.clear()
         self.preset.addItems(anki_util.read_user_files_folder())
@@ -129,10 +164,19 @@ class BaseBackfillDialog(QDialog):
     def _run_single_field(self):
         expression_field = self.expression_field.currentText()
         reading_field = self.reading_field.currentText()
+
+        # Save field memory
+        if self.primary_model_id:
+            config_manager.save_field_memory(
+                self.primary_model_id,
+                expression_field,
+                reading_field
+            )
+
         field = self.fields.currentText()
         handlebars = [p.lstrip("{").rstrip("}") for p in self.yomitan_handlebars.text().split(",") if p.strip()]
         should_replace = self.replace.isChecked()
-            
+
         note_ids = self._get_note_ids()
         op = CollectionOp(
             parent = mw,
@@ -144,6 +188,14 @@ class BaseBackfillDialog(QDialog):
     def _run_preset(self):
         expression_field = self.expression_field.currentText()
         reading_field = self.reading_field.currentText()
+
+        if self.primary_model_id:
+            config_manager.save_field_memory(
+                self.primary_model_id,
+                expression_field,
+                reading_field
+            )
+
         target_tuples = []
         try:
             path = os.path.join(anki_util.get_user_files_dir(), self.preset.currentText())

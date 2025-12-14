@@ -60,4 +60,12 @@ class BrowserBackfill:
         
         def _get_deck_id(self):
             return self.deck_id
-        
+
+        def _get_primary_model_id(self):
+            if self.note_ids:
+                try:
+                    note = mw.col.get_note(self.note_ids[0])
+                    return note.mid
+                except:
+                    pass
+            return None
